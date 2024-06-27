@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use ndarray::{array, Array1};
 use rand::prelude::*;
 use rand_distr::Normal;

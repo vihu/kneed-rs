@@ -1,11 +1,13 @@
+#![allow(dead_code)]
+
 use crate::knee_locator::{ValidCurve, ValidDirection};
 use ndarray::{s, stack, Array, Array1, Axis};
 use ndarray_linalg::Solve;
 
-pub type Shape = (ValidDirection, ValidCurve);
+type Shape = (ValidDirection, ValidCurve);
 
 /// Detect the direction and curve type of the line.
-pub fn find_shape(x: &Array1<f64>, y: &Array1<f64>) -> Shape {
+fn find_shape(x: &Array1<f64>, y: &Array1<f64>) -> Shape {
     // Perform polynomial fitting
     let a = stack![Axis(1), x.mapv(|xi| xi), Array::ones(x.len())];
     let p = a.t().dot(&a).solve(&a.t().dot(y)).unwrap();

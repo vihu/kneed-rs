@@ -274,7 +274,7 @@ impl KneeLocator {
 
         // Placeholders for which threshold region i is located in
         let mut maxima_threshold_index = 0;
-        let mut minima_threshold_index = 0;
+        let mut _minima_threshold_index = 0;
         let mut knee: Option<f64> = None;
         let mut norm_knee: Option<f64> = None;
         let mut threshold = 0.0;
@@ -304,7 +304,7 @@ impl KneeLocator {
             // Values in difference curve are at or after a local minimum
             if self.minima_indices.contains(&i) {
                 threshold = 0.0;
-                minima_threshold_index += 1;
+                _minima_threshold_index += 1;
             }
 
             if self.y_difference[j] < threshold {
@@ -453,7 +453,7 @@ mod tests {
     //         ValidDirection::Increasing,
     //         InterpMethod::Interp1d,
     //     );
-    //     let kneedle = KneeLocator::new(x, y, 1.0, params, false, 7);
+    //     let kneedle = KneeLocator::new(x, y, 1.0, params);
     //     let elbow = kneedle.elbow().unwrap();
     //     println!("elbow: {:?}", elbow);
     //
