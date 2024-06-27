@@ -71,9 +71,13 @@ pub struct KneeLocator {
 }
 
 impl KneeLocator {
-    pub fn new(
-        x: Array1<f64>,
-        y: Array1<f64>,
+    pub fn new(x: Vec<f64>, y: Vec<f64>, s: f64, params: KneeLocatorParams) -> Self {
+        Self::parameterized_new(x, y, s, params, false, 7)
+    }
+
+    pub fn parameterized_new(
+        x: Vec<f64>,
+        y: Vec<f64>,
         s: f64,
         params: KneeLocatorParams,
         online: bool,
@@ -81,8 +85,8 @@ impl KneeLocator {
     ) -> Self {
         let n = x.len();
         let mut knee_locator = KneeLocator {
-            x,
-            y,
+            x: Array1::from_vec(x),
+            y: Array1::from_vec(y),
             curve: params.curve,
             direction: params.direction,
             s,
@@ -246,26 +250,6 @@ impl KneeLocator {
             .map(|&i| self.y_difference[i])
             .collect::<Vec<f64>>()
             .into();
-    }
-
-    fn find_local_maxima(&self, arr: &Array1<f64>) -> Vec<usize> {
-        let mut maxima = Vec::new();
-        for i in 1..arr.len() - 1 {
-            if arr[i] >= arr[i - 1] && arr[i] >= arr[i + 1] {
-                maxima.push(i);
-            }
-        }
-        maxima
-    }
-
-    fn find_local_minima(&self, arr: &Array1<f64>) -> Vec<usize> {
-        let mut minima = Vec::new();
-        for i in 1..arr.len() - 1 {
-            if arr[i] <= arr[i - 1] && arr[i] <= arr[i + 1] {
-                minima.push(i);
-            }
-        }
-        minima
     }
 
     fn calculate_thresholds(&mut self) {
@@ -443,7 +427,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kneedle = KneeLocator::new(x, y, 1.0, params, false, 7);
+        let kneedle = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
 
         assert_relative_eq!(0.222222222222222, kneedle.knee.unwrap());
         assert_relative_eq!(1.8965517241379306, kneedle.knee_y.unwrap());
