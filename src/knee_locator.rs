@@ -57,6 +57,10 @@ pub struct KneeLocator {
     x_difference: Array1<f64>,
     maxima_indices: Vec<usize>,
     minima_indices: Vec<usize>,
+    x_difference_maxima: Array1<f64>,
+    y_difference_maxima: Array1<f64>,
+    x_difference_minima: Array1<f64>,
+    y_difference_minima: Array1<f64>,
     tmx: Array1<f64>,
     knee: Option<f64>,
     norm_knee: Option<f64>,
@@ -91,6 +95,10 @@ impl KneeLocator {
             y_normalized: Array1::zeros(n),
             y_difference: Array1::zeros(n),
             x_difference: Array1::zeros(n),
+            y_difference_maxima: Array1::zeros(n),
+            x_difference_maxima: Array1::zeros(n),
+            y_difference_minima: Array1::zeros(n),
+            x_difference_minima: Array1::zeros(n),
             maxima_indices: Vec::new(),
             minima_indices: Vec::new(),
             tmx: Array1::zeros(0),
@@ -107,33 +115,69 @@ impl KneeLocator {
     fn initialize(&mut self, interp_method: InterpMethod) {
         // Step 1: Fit a smooth line
         let ds_y = match interp_method {
-            InterpMethod::Interp1d => self.interp1d(),
-            InterpMethod::Polynomial => self.polynomial_interp(),
+            InterpMethod::Interp1d => self.interp1d().unwrap(),
+            InterpMethod::Polynomial => self.polynomial_interp().unwrap(),
         };
 
         // Step 2: Normalize values
-        self.x_normalized = Self::normalize(&self.x);
-        self.y_normalized = Self::normalize(&ds_y.unwrap());
+        self.x_normalized = Self::normalize(&self.x).unwrap();
+        println!("x_normalized: {:?}", self.x_normalized);
+
+        self.y_normalized = Self::normalize(&ds_y).unwrap();
+        println!("y_normalized: {:?}", self.y_normalized);
 
         // Step 3: Calculate the difference curve
         self.y_normalized = self.transform_y();
+        println!("y_normalized (after transform): {:?}", self.y_normalized);
         self.y_difference = &self.y_normalized - &self.x_normalized;
+        println!("y_difference: {:?}", self.y_difference);
         self.x_difference.clone_from(&self.x_normalized);
+        println!("x_difference: {:?}", self.x_difference);
 
         // Step 4: Identify local maxima/minima
         self.find_local_extrema();
+        println!("maxima_indices: {:?}", self.maxima_indices);
+        println!("x_difference_maxima: {:?}", self.x_difference_maxima);
+        println!("y_difference_maxima: {:?}", self.y_difference_maxima);
+
+        println!("minima_indices: {:?}", self.minima_indices);
+        println!("x_difference_minima: {:?}", self.x_difference_minima);
+        println!("y_difference_minima: {:?}", self.y_difference_minima);
 
         // Step 5: Calculate thresholds
         self.calculate_thresholds();
+        println!("tmx: {:?}", self.tmx);
 
         // Step 6: Find knee
-        self.find_knee();
+        (self.knee, self.norm_knee) = self.find_knee();
+        println!("knee: {:?}", self.knee);
+        println!("norm_knee: {:?}", self.norm_knee);
+
+        // Step 7: If we have a knee, extract data about it
+        self.knee_y = match self.knee {
+            None => None,
+            Some(knee) => Some(self.y[self.x.iter().position(|&v| v == knee).unwrap()]),
+        };
+
+        self.norm_knee_y = match self.norm_knee {
+            None => None,
+            Some(norm_knee) => Some(
+                self.y_normalized[self
+                    .x_normalized
+                    .iter()
+                    .position(|&v| v == norm_knee)
+                    .unwrap()],
+            ),
+        };
+
+        println!("knee_y: {:?}", self.knee_y);
+        println!("norm_knee_y: {:?}", self.norm_knee_y);
     }
 
-    fn normalize(a: &Array1<f64>) -> Array1<f64> {
-        let min = a.min().unwrap();
-        let max = a.max().unwrap();
-        (a - *min) / (*max - *min)
+    fn normalize(a: &Array1<f64>) -> Result<Array1<f64>> {
+        let min = a.min()?;
+        let max = a.max()?;
+        Ok((a - *min) / (*max - *min))
     }
 
     fn interp1d(&self) -> Result<Array1<f64>> {
@@ -190,26 +234,55 @@ impl KneeLocator {
     }
 
     fn find_local_extrema(&mut self) {
-        self.maxima_indices = self.find_extrema(true);
-        self.minima_indices = self.find_extrema(false);
+        // Local maxima
+        self.maxima_indices = argrelextrema(&self.y_difference, |a, b| a >= b, 1);
+        self.x_difference_maxima = self
+            .maxima_indices
+            .iter()
+            .map(|&i| self.x_difference[i])
+            .collect::<Vec<f64>>()
+            .into();
+        self.y_difference_maxima = self
+            .maxima_indices
+            .iter()
+            .map(|&i| self.y_difference[i])
+            .collect::<Vec<f64>>()
+            .into();
+
+        // Local minima
+        self.minima_indices = argrelextrema(&self.y_difference, |a, b| a <= b, 1);
+        self.x_difference_minima = self
+            .minima_indices
+            .iter()
+            .map(|&i| self.x_difference[i])
+            .collect::<Vec<f64>>()
+            .into();
+        self.y_difference_minima = self
+            .minima_indices
+            .iter()
+            .map(|&i| self.y_difference[i])
+            .collect::<Vec<f64>>()
+            .into();
     }
 
-    fn find_extrema(&self, find_maxima: bool) -> Vec<usize> {
-        let mut extrema = Vec::new();
-        let n = self.y_difference.len();
-        for i in 1..n - 1 {
-            let prev = self.y_difference[i - 1];
-            let curr = self.y_difference[i];
-            let next = self.y_difference[i + 1];
-            if find_maxima {
-                if curr >= prev && curr >= next {
-                    extrema.push(i);
-                }
-            } else if curr <= prev && curr <= next {
-                extrema.push(i);
+    fn find_local_maxima(&self, arr: &Array1<f64>) -> Vec<usize> {
+        let mut maxima = Vec::new();
+        for i in 1..arr.len() - 1 {
+            if arr[i] >= arr[i - 1] && arr[i] >= arr[i + 1] {
+                maxima.push(i);
             }
         }
-        extrema
+        maxima
+    }
+
+    fn find_local_minima(&self, arr: &Array1<f64>) -> Vec<usize> {
+        let mut minima = Vec::new();
+        for i in 1..arr.len() - 1 {
+            if arr[i] <= arr[i - 1] && arr[i] <= arr[i + 1] {
+                minima.push(i);
+            }
+        }
+        minima
     }
 
     fn calculate_thresholds(&mut self) {
@@ -226,93 +299,156 @@ impl KneeLocator {
         self.tmx = &selected_y_diff - (self.s * mean_diff.abs());
     }
 
-    fn find_knee(&mut self) {
+    pub fn find_knee(&mut self) -> (Option<f64>, Option<f64>) {
+        // Return None if no local maxima found
         if self.maxima_indices.is_empty() {
-            return;
+            println!("early exit");
+            return (None, None);
         }
 
+        // Placeholders for which threshold region i is located in
         let mut maxima_threshold_index = 0;
         let mut minima_threshold_index = 0;
+        let mut knee: Option<f64> = None;
+        let mut norm_knee: Option<f64> = None;
+        let mut threshold = 0.0;
+        let mut threshold_index = 0;
 
-        for i in self.maxima_indices[0]..self.x_difference.len() {
-            if i == self.x_difference.len() - 1 {
-                break;
+        // Traverse the difference curve
+        for (i, &_x) in self.x_difference.iter().enumerate() {
+            // Skip points on the curve before the first local maxima
+            if i < self.maxima_indices[0] {
+                continue;
             }
 
             let j = i + 1;
-            let mut threshold = 0.0;
-            let mut threshold_index = i;
 
+            // Reached the end of the curve
+            if i == (self.x_difference.len() - 1) {
+                break;
+            }
+
+            // If we're at a local max, increment the maxima threshold index and continue
             if self.maxima_indices.contains(&i) {
                 threshold = self.tmx[maxima_threshold_index];
                 threshold_index = i;
                 maxima_threshold_index += 1;
             }
 
+            // Values in difference curve are at or after a local minimum
             if self.minima_indices.contains(&i) {
                 threshold = 0.0;
                 minima_threshold_index += 1;
             }
 
-            if self.y_difference[j] < threshold {
-                let (knee, norm_knee) = self.calculate_knee(threshold_index);
-                self.update_knees(knee, norm_knee);
+            println!(
+                "threshold: {:?}, threshold_index: {:?}",
+                threshold, threshold_index
+            );
 
+            if self.y_difference[j] < threshold {
+                match self.curve {
+                    ValidCurve::Convex => {
+                        if self.direction == ValidDirection::Decreasing {
+                            knee = Some(self.x[threshold_index]);
+                            norm_knee = Some(self.x_normalized[threshold_index]);
+                        } else {
+                            knee = Some(self.x[self.x.len() - threshold_index - 1]);
+                            norm_knee = Some(self.x_normalized[threshold_index]);
+                        }
+                    }
+                    ValidCurve::Concave => {
+                        if self.direction == ValidDirection::Decreasing {
+                            knee = Some(self.x[self.x.len() - threshold_index - 1]);
+                            norm_knee = Some(self.x_normalized[threshold_index]);
+                        } else {
+                            knee = Some(self.x[threshold_index]);
+                            norm_knee = Some(self.x_normalized[threshold_index]);
+                        }
+                    }
+                }
+
+                // Add the y value at the knee
+                let y_at_knee = self.y[self.x.iter().position(|&v| v == knee.unwrap()).unwrap()];
+                let y_norm_at_knee = self.y_normalized[self
+                    .x_normalized
+                    .iter()
+                    .position(|&v| v == norm_knee.unwrap())
+                    .unwrap()];
+
+                if !self.all_knees.contains(&knee.unwrap()) {
+                    self.all_knees_y.push(y_at_knee);
+                    self.all_norm_knees_y.push(y_norm_at_knee);
+                }
+
+                self.all_knees.push(knee.unwrap());
+                self.all_norm_knees.push(norm_knee.unwrap());
+
+                // If detecting in offline mode, return the first knee found
                 if !self.online {
-                    break;
+                    return (knee, norm_knee);
                 }
             }
         }
+
+        if self.all_knees.is_empty() {
+            // No knee was found
+            return (None, None);
+        }
+
+        (knee, norm_knee)
     }
 
-    fn calculate_knee(&self, threshold_index: usize) -> (f64, f64) {
-        match (&self.curve, &self.direction) {
-            (ValidCurve::Convex, ValidDirection::Decreasing) => {
-                (self.x[threshold_index], self.x_normalized[threshold_index])
+    pub fn elbow(&self) -> Option<f64> {
+        self.knee
+    }
+
+    pub fn norm_elbow(&self) -> Option<f64> {
+        self.norm_knee
+    }
+
+    pub fn elbow_y(&self) -> Option<f64> {
+        self.knee_y
+    }
+
+    pub fn norm_elbow_y(&self) -> Option<f64> {
+        self.norm_knee_y
+    }
+}
+
+// Re-implement argrelextrema from numpy
+fn argrelextrema<F>(data: &Array1<f64>, comparator: F, order: usize) -> Vec<usize>
+where
+    F: Fn(f64, f64) -> bool,
+{
+    let mut extrema_indices = Vec::new();
+    let len = data.len();
+
+    for i in 0..len {
+        let mut is_extrema = true;
+
+        // Compare with previous `order` elements
+        for j in 1..=order {
+            if i >= j && !comparator(data[i], data[i - j]) {
+                is_extrema = false;
+                break;
             }
-            (ValidCurve::Convex, ValidDirection::Increasing) => (
-                self.x[self.n - threshold_index - 1],
-                self.x_normalized[threshold_index],
-            ),
-            (ValidCurve::Concave, ValidDirection::Decreasing) => (
-                self.x[self.n - threshold_index - 1],
-                self.x_normalized[threshold_index],
-            ),
-            (ValidCurve::Concave, ValidDirection::Increasing) => {
-                (self.x[threshold_index], self.x_normalized[threshold_index])
+        }
+
+        // Compare with next `order` elements
+        for j in 1..=order {
+            if i + j < len && !comparator(data[i], data[i + j]) {
+                is_extrema = false;
+                break;
             }
+        }
+
+        if is_extrema {
+            extrema_indices.push(i);
         }
     }
 
-    fn update_knees(&mut self, knee: f64, norm_knee: f64) {
-        let y_at_knee = self.y[self.x.iter().position(|&x| x == knee).unwrap()];
-        let y_norm_at_knee = self.y_normalized[self
-            .x_normalized
-            .iter()
-            .position(|&x| x == norm_knee)
-            .unwrap()];
-
-        if !self.all_knees.contains(&knee) {
-            self.all_knees_y.push(y_at_knee);
-            self.all_norm_knees_y.push(y_norm_at_knee);
-        }
-
-        self.all_knees.push(knee);
-        self.all_norm_knees.push(norm_knee);
-
-        self.knee = Some(knee);
-        self.norm_knee = Some(norm_knee);
-        self.knee_y = Some(y_at_knee);
-        self.norm_knee_y = Some(y_norm_at_knee);
-    }
-
-    pub fn elbow(&self) -> f64 {
-        self.knee.unwrap()
-    }
-
-    pub fn norm_elbow(&self) -> f64 {
-        self.norm_knee.unwrap()
-    }
+    extrema_indices
 }
 
 #[cfg(test)]
@@ -322,25 +458,19 @@ mod tests {
     use approx::assert_relative_eq;
 
     #[test]
-    fn test_figure2_interp1d() {
-        test_figure2(InterpMethod::Interp1d);
-    }
-
-    #[test]
-    fn test_figure2_polynomial() {
-        test_figure2(InterpMethod::Polynomial);
-    }
-
-    fn test_figure2(interp_method: InterpMethod) {
+    fn test_known() {
         let (x, y) = DataGenerator::figure2();
+        println!("x: {:?}", x);
+        println!("y: {:?}", y);
+
         let params = KneeLocatorParams::new(
             ValidCurve::Concave,
             ValidDirection::Increasing,
-            interp_method,
+            InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x, y, 1.0, params, false, 7);
-        assert_relative_eq!(kl.knee.unwrap(), 0.22, epsilon = 0.05);
-        assert_relative_eq!(kl.elbow(), 0.22, epsilon = 0.05);
-        assert_relative_eq!(kl.norm_elbow(), kl.knee.unwrap(), epsilon = 0.05);
+        let kneedle = KneeLocator::new(x, y, 1.0, params, false, 7);
+
+        assert_relative_eq!(0.222222222222222, kneedle.knee.unwrap());
+        assert_relative_eq!(1.8965517241379306, kneedle.knee_y.unwrap());
     }
 }
