@@ -22,6 +22,7 @@ pub enum InterpMethod {
     Polynomial,
 }
 
+#[derive(Debug)]
 pub struct KneeLocatorParams {
     curve: ValidCurve,
     direction: ValidDirection,
@@ -38,6 +39,7 @@ impl KneeLocatorParams {
     }
 }
 
+#[derive(Debug)]
 pub struct KneeLocator {
     x: Array1<f64>,
     y: Array1<f64>,
@@ -121,37 +123,21 @@ impl KneeLocator {
 
         // Step 2: Normalize values
         self.x_normalized = Self::normalize(&self.x).unwrap();
-        println!("x_normalized: {:?}", self.x_normalized);
-
         self.y_normalized = Self::normalize(&ds_y).unwrap();
-        println!("y_normalized: {:?}", self.y_normalized);
 
         // Step 3: Calculate the difference curve
         self.y_normalized = self.transform_y();
-        println!("y_normalized (after transform): {:?}", self.y_normalized);
         self.y_difference = &self.y_normalized - &self.x_normalized;
-        println!("y_difference: {:?}", self.y_difference);
         self.x_difference.clone_from(&self.x_normalized);
-        println!("x_difference: {:?}", self.x_difference);
 
         // Step 4: Identify local maxima/minima
         self.find_local_extrema();
-        println!("maxima_indices: {:?}", self.maxima_indices);
-        println!("x_difference_maxima: {:?}", self.x_difference_maxima);
-        println!("y_difference_maxima: {:?}", self.y_difference_maxima);
-
-        println!("minima_indices: {:?}", self.minima_indices);
-        println!("x_difference_minima: {:?}", self.x_difference_minima);
-        println!("y_difference_minima: {:?}", self.y_difference_minima);
 
         // Step 5: Calculate thresholds
         self.calculate_thresholds();
-        println!("tmx: {:?}", self.tmx);
 
         // Step 6: Find knee
         (self.knee, self.norm_knee) = self.find_knee();
-        println!("knee: {:?}", self.knee);
-        println!("norm_knee: {:?}", self.norm_knee);
 
         // Step 7: If we have a knee, extract data about it
         self.knee_y = match self.knee {
@@ -169,9 +155,6 @@ impl KneeLocator {
                     .unwrap()],
             ),
         };
-
-        println!("knee_y: {:?}", self.knee_y);
-        println!("norm_knee_y: {:?}", self.norm_knee_y);
     }
 
     fn normalize(a: &Array1<f64>) -> Result<Array1<f64>> {
@@ -302,7 +285,6 @@ impl KneeLocator {
     pub fn find_knee(&mut self) -> (Option<f64>, Option<f64>) {
         // Return None if no local maxima found
         if self.maxima_indices.is_empty() {
-            println!("early exit");
             return (None, None);
         }
 
@@ -340,11 +322,6 @@ impl KneeLocator {
                 threshold = 0.0;
                 minima_threshold_index += 1;
             }
-
-            println!(
-                "threshold: {:?}, threshold_index: {:?}",
-                threshold, threshold_index
-            );
 
             if self.y_difference[j] < threshold {
                 match self.curve {
@@ -460,8 +437,6 @@ mod tests {
     #[test]
     fn test_known() {
         let (x, y) = DataGenerator::figure2();
-        println!("x: {:?}", x);
-        println!("y: {:?}", y);
 
         let params = KneeLocatorParams::new(
             ValidCurve::Concave,
@@ -473,4 +448,34 @@ mod tests {
         assert_relative_eq!(0.222222222222222, kneedle.knee.unwrap());
         assert_relative_eq!(1.8965517241379306, kneedle.knee_y.unwrap());
     }
+
+    // #[test]
+    // fn test_known_csv_values() {
+    //     let mut rdr = csv::Reader::from_path("/path/to/csv").unwrap();
+    //     let mut scores = Vec::new();
+    //     for result in rdr.records() {
+    //         let record = result.unwrap();
+    //         let score = record.get(1).unwrap().parse::<f64>().unwrap();
+    //         scores.push(score)
+    //     }
+    //     scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    //
+    //     let range = 0..scores.len();
+    //     let x = Array1::from_iter(range.map(|i| i as f64));
+    //     let y = Array1::from_vec(scores);
+    //
+    //     let params = KneeLocatorParams::new(
+    //         ValidCurve::Convex,
+    //         ValidDirection::Increasing,
+    //         InterpMethod::Interp1d,
+    //     );
+    //     let kneedle = KneeLocator::new(x, y, 1.0, params, false, 7);
+    //     let elbow = kneedle.elbow().unwrap();
+    //     println!("elbow: {:?}", elbow);
+    //
+    //     let elbow_y = kneedle.elbow_y();
+    //     println!("elbow_y: {:?}", elbow_y);
+    //
+    //     assert!(false)
+    // }
 }
