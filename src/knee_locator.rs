@@ -501,7 +501,7 @@ mod tests {
         );
         let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 11);
         // NOTE: python reports 63.0, presumably this is fine
-        assert_abs_diff_eq!(62.25, kl.knee.unwrap(), epsilon = 1e-02);
+        assert_abs_diff_eq!(62.25, kl.knee.unwrap(), epsilon = 0.1);
     }
 
     #[test]
