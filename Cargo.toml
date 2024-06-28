@@ -1,6 +1,6 @@
 [package]
 name = "kneed_rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 repository = "https://github.com/vihu/kneed-rs"
 authors = ["Rahul Garg"]
@@ -21,4 +21,4 @@ rand_distr = "0"
 polyfit-rs = "0"
 
 [dev-dependencies]
-approx = "0.4.0"
+approx = "0"
