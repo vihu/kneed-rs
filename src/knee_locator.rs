@@ -71,6 +71,38 @@ pub struct KneeLocator {
 }
 
 impl KneeLocator {
+    pub fn elbow(&self) -> Option<f64> {
+        self.knee
+    }
+
+    pub fn norm_elbow(&self) -> Option<f64> {
+        self.norm_knee
+    }
+
+    pub fn elbow_y(&self) -> Option<f64> {
+        self.knee_y
+    }
+
+    pub fn norm_elbow_y(&self) -> Option<f64> {
+        self.norm_knee_y
+    }
+
+    pub fn all_elbows(&self) -> Vec<f64> {
+        self.all_knees.clone()
+    }
+
+    pub fn all_norm_elbows(&self) -> Vec<f64> {
+        self.all_norm_knees.clone()
+    }
+
+    pub fn all_elbows_y(&self) -> Vec<f64> {
+        self.all_knees_y.clone()
+    }
+
+    pub fn all_norm_elbows_y(&self) -> Vec<f64> {
+        self.all_norm_knees_y.clone()
+    }
+
     pub fn new(x: Vec<f64>, y: Vec<f64>, s: f64, params: KneeLocatorParams) -> Self {
         Self::parameterized_new(x, y, s, params, false, 7)
     }
@@ -266,7 +298,7 @@ impl KneeLocator {
         self.tmx = &selected_y_diff - (self.s * mean_diff.abs());
     }
 
-    pub fn find_knee(&mut self) -> (Option<f64>, Option<f64>) {
+    fn find_knee(&mut self) -> (Option<f64>, Option<f64>) {
         // Return None if no local maxima found
         if self.maxima_indices.is_empty() {
             return (None, None);
@@ -358,38 +390,6 @@ impl KneeLocator {
         }
 
         (knee, norm_knee)
-    }
-
-    pub fn elbow(&self) -> Option<f64> {
-        self.knee
-    }
-
-    pub fn norm_elbow(&self) -> Option<f64> {
-        self.norm_knee
-    }
-
-    pub fn elbow_y(&self) -> Option<f64> {
-        self.knee_y
-    }
-
-    pub fn norm_elbow_y(&self) -> Option<f64> {
-        self.norm_knee_y
-    }
-
-    pub fn all_elbows(&self) -> Vec<f64> {
-        self.all_knees.clone()
-    }
-
-    pub fn all_norm_elbows(&self) -> Vec<f64> {
-        self.all_norm_knees.clone()
-    }
-
-    pub fn all_elbows_y(&self) -> Vec<f64> {
-        self.all_knees_y.clone()
-    }
-
-    pub fn all_norm_elbows_y(&self) -> Vec<f64> {
-        self.all_norm_knees_y.clone()
     }
 }
 
