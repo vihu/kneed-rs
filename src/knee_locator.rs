@@ -372,10 +372,9 @@ impl KneeLocator {
                 if !self.all_knees.contains(&knee.unwrap()) {
                     self.all_knees_y.push(y_at_knee);
                     self.all_norm_knees_y.push(y_norm_at_knee);
+                    self.all_knees.push(knee.unwrap());
+                    self.all_norm_knees.push(norm_knee.unwrap());
                 }
-
-                self.all_knees.push(knee.unwrap());
-                self.all_norm_knees.push(norm_knee.unwrap());
 
                 // If detecting in offline mode, return the first knee found
                 if !self.online {
@@ -1069,41 +1068,44 @@ mod tests {
         assert_abs_diff_eq!(73.0, kl.knee.unwrap());
     }
 
-    // #[test]
-    // fn test_all_knees() {
-    //     let (x, y) = DataGenerator::bumpy();
-    //     let params = KneeLocatorParams::new(
-    //         ValidCurve::Convex,
-    //         ValidDirection::Decreasing,
-    //         InterpMethod::Interp1d,
-    //     );
-    //     let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7);
-    //
-    //     let expected_elbows = [26.0, 31.0, 41.0, 46.0, 53.0];
-    //     let mut all_elbows = kl.all_elbows();
-    //     all_elbows.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    //
-    //     for (detected, expected) in all_elbows.iter().zip(expected_elbows.iter()) {
-    //         println!("Detected elbow: {}, Expected elbow: {}", detected, expected);
-    //         assert_abs_diff_eq!(detected, expected, epsilon = 0.1);
-    //     }
-    //
-    //     let expected_norm_elbows = [
-    //         0.2921348314606742,
-    //         0.348314606741573,
-    //         0.4606741573033708,
-    //         0.5168539325842696,
-    //         0.5955056179775281,
-    //     ];
-    //     let mut all_norm_elbows = kl.all_norm_elbows();
-    //     all_norm_elbows.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    //
-    //     for (detected, expected) in all_norm_elbows.iter().zip(expected_norm_elbows.iter()) {
-    //         println!(
-    //             "Detected norm elbow: {}, Expected norm elbow: {}",
-    //             detected, expected
-    //         );
-    //         assert_abs_diff_eq!(detected, expected, epsilon = 1e-6);
-    //     }
-    // }
+    #[test]
+    fn test_all_knees() {
+        let (x, y) = DataGenerator::bumpy();
+        let params = KneeLocatorParams::new(
+            ValidCurve::Convex,
+            ValidDirection::Decreasing,
+            InterpMethod::Interp1d,
+        );
+        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7);
+
+        let expected_elbows = [26.0, 31.0, 41.0, 46.0, 53.0];
+        let mut all_elbows = kl.all_elbows();
+        all_elbows.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        println!("expected elbows {:?}", expected_elbows);
+        println!("detected elbows {:?}", all_elbows);
+
+        for (detected, expected) in all_elbows.iter().zip(expected_elbows.iter()) {
+            println!("Detected elbow: {}, Expected elbow: {}", detected, expected);
+            assert_abs_diff_eq!(detected, expected, epsilon = 0.1);
+        }
+
+        let expected_norm_elbows = [
+            0.2921348314606742,
+            0.348314606741573,
+            0.4606741573033708,
+            0.5168539325842696,
+            0.5955056179775281,
+        ];
+        let mut all_norm_elbows = kl.all_norm_elbows();
+        all_norm_elbows.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        for (detected, expected) in all_norm_elbows.iter().zip(expected_norm_elbows.iter()) {
+            println!(
+                "Detected norm elbow: {}, Expected norm elbow: {}",
+                detected, expected
+            );
+            assert_abs_diff_eq!(detected, expected, epsilon = 1e-6);
+        }
+    }
 }
