@@ -1,8 +1,15 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ndarray::{s, Array1, Axis};
 use ndarray_interp::interp1d::Interp1DBuilder;
 use ndarray_stats::QuantileExt;
 use polyfit_rs::polyfit_rs::polyfit;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum KneeLocatorError {
+    #[error("parameter error {0}")]
+    ParamError(String),
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ValidCurve {
@@ -103,7 +110,24 @@ impl KneeLocator {
         self.all_norm_knees_y.clone()
     }
 
-    pub fn new(x: Vec<f64>, y: Vec<f64>, s: f64, params: KneeLocatorParams) -> Self {
+    fn check_x_y(x: &[f64], y: &[f64]) -> Result<()> {
+        if x.is_empty() || y.is_empty() {
+            bail!(KneeLocatorError::ParamError(
+                "input series cannot be empty!".to_string()
+            ));
+        }
+
+        if x.len() != y.len() {
+            bail!(KneeLocatorError::ParamError(
+                "input series should have equal length!".to_string()
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn new(x: Vec<f64>, y: Vec<f64>, s: f64, params: KneeLocatorParams) -> Result<Self> {
+        Self::check_x_y(&x, &y)?;
         Self::parameterized_new(x, y, s, params, false, 7)
     }
 
@@ -114,7 +138,8 @@ impl KneeLocator {
         params: KneeLocatorParams,
         online: bool,
         polynomial_degree: usize,
-    ) -> Self {
+    ) -> Result<Self> {
+        Self::check_x_y(&x, &y)?;
         let n = x.len();
         let mut knee_locator = KneeLocator {
             x: Array1::from_vec(x),
@@ -147,7 +172,7 @@ impl KneeLocator {
         };
 
         knee_locator.initialize(params.interp_method);
-        knee_locator
+        Ok(knee_locator)
     }
 
     fn initialize(&mut self, interp_method: InterpMethod) {
@@ -465,7 +490,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
 
         assert_abs_diff_eq!(0.222222222222222, kl.knee.unwrap());
         assert_abs_diff_eq!(0.222222222222222, kl.elbow().unwrap());
@@ -482,7 +507,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
 
         assert_abs_diff_eq!(0.222222222222222, kl.knee.unwrap());
         assert_abs_diff_eq!(0.222222222222222, kl.elbow().unwrap());
@@ -498,7 +523,8 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 11);
+        let kl =
+            KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 11).unwrap();
         // NOTE: python reports 63.0, presumably this is fine
         assert_abs_diff_eq!(62.25, kl.knee.unwrap(), epsilon = 0.1);
     }
@@ -511,7 +537,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(2.0, kl.knee.unwrap());
     }
 
@@ -523,7 +549,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(2.0, kl.knee.unwrap());
     }
 
@@ -535,7 +561,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(7.0, kl.knee.unwrap());
     }
 
@@ -547,7 +573,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(7.0, kl.knee.unwrap());
     }
 
@@ -559,7 +585,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(7.0, kl.knee.unwrap());
     }
 
@@ -571,7 +597,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(7.0, kl.knee.unwrap());
     }
 
@@ -583,7 +609,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(2.0, kl.knee.unwrap());
     }
 
@@ -595,7 +621,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(2.0, kl.knee.unwrap());
     }
 
@@ -610,7 +636,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.2, kl.knee.unwrap());
     }
 
@@ -625,7 +651,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.2, kl.knee.unwrap());
     }
 
@@ -640,7 +666,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.4, kl.knee.unwrap());
     }
 
@@ -655,7 +681,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.4, kl.knee.unwrap());
     }
 
@@ -670,7 +696,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.4, kl.knee.unwrap());
     }
 
@@ -685,7 +711,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.4, kl.knee.unwrap());
     }
 
@@ -700,7 +726,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.2, kl.knee.unwrap());
     }
 
@@ -715,7 +741,7 @@ mod tests {
 
         let (x1, y1) = truncate_and_scale(&x, &y, 3, 10.0);
 
-        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x1.to_vec(), y1.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(0.2, kl.knee.unwrap());
     }
 
@@ -727,7 +753,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(26.0, kl.knee.unwrap());
     }
 
@@ -739,7 +765,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Polynomial,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(28.0, kl.knee.unwrap());
     }
 
@@ -765,7 +791,8 @@ mod tests {
             InterpMethod::Interp1d,
         );
 
-        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7);
+        let kl =
+            KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7).unwrap();
 
         // NOTE: python reports 482.0, presumably because gamma sampling might differ?
         assert_abs_diff_eq!(497.0, kl.knee.unwrap());
@@ -793,7 +820,8 @@ mod tests {
             InterpMethod::Interp1d,
         );
 
-        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, false, 7);
+        let kl =
+            KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, false, 7).unwrap();
 
         // NOTE: python reports 22.0, presumably because gamma sampling might differ?
         assert_abs_diff_eq!(71.0, kl.knee.unwrap());
@@ -823,7 +851,8 @@ mod tests {
 
         for (&s, &expected_knee) in sensitivity.iter().zip(expected_knees.iter()) {
             let kl =
-                KneeLocator::parameterized_new(x.clone(), y.clone(), s, params.clone(), false, 7);
+                KneeLocator::parameterized_new(x.clone(), y.clone(), s, params.clone(), false, 7)
+                    .unwrap();
             let detected_knee = kl.knee.unwrap();
             println!(
                 "Sensitivity: {}, Detected Knee: {}, Expected Knee: {}",
@@ -850,7 +879,8 @@ mod tests {
         for (direction, curve) in sine_combos {
             let params = KneeLocatorParams::new(curve, direction, InterpMethod::Interp1d);
             let kl_sine =
-                KneeLocator::parameterized_new(x.to_vec(), y_sin.to_vec(), 1.0, params, true, 1);
+                KneeLocator::parameterized_new(x.to_vec(), y_sin.to_vec(), 1.0, params, true, 1)
+                    .unwrap();
             detected_knees.push(kl_sine.knee.unwrap());
         }
 
@@ -892,9 +922,9 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl1 = KneeLocator::new(x.to_vec(), y.to_vec(), 0.0, params.clone());
+        let kl1 = KneeLocator::new(x.to_vec(), y.to_vec(), 0.0, params.clone()).unwrap();
         assert_abs_diff_eq!(1.0, kl1.knee.unwrap());
-        let kl2 = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl2 = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(8.0, kl2.knee.unwrap());
     }
 
@@ -906,7 +936,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert_abs_diff_eq!(1.897, kl.knee_y.unwrap(), epsilon = 0.03);
         assert_abs_diff_eq!(1.897, kl.all_knees_y[0], epsilon = 0.03);
         assert_abs_diff_eq!(0.758, kl.norm_knee_y.unwrap(), epsilon = 0.03);
@@ -927,7 +957,7 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params);
+        let kl = KneeLocator::new(x.to_vec(), y.to_vec(), 1.0, params).unwrap();
         assert!(kl.knee.is_none());
         assert!(kl.norm_knee_y.is_none());
     }
@@ -941,7 +971,7 @@ mod tests {
             ValidDirection::Increasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::new(x, y, 1.0, params);
+        let kl = KneeLocator::new(x, y, 1.0, params).unwrap();
         assert!(kl.knee.is_none());
     }
 
@@ -1063,7 +1093,8 @@ mod tests {
             InterpMethod::Interp1d,
         );
 
-        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7);
+        let kl =
+            KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7).unwrap();
 
         assert_abs_diff_eq!(73.0, kl.knee.unwrap());
     }
@@ -1076,7 +1107,8 @@ mod tests {
             ValidDirection::Decreasing,
             InterpMethod::Interp1d,
         );
-        let kl = KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7);
+        let kl =
+            KneeLocator::parameterized_new(x.to_vec(), y.to_vec(), 1.0, params, true, 7).unwrap();
 
         let expected_elbows = [26.0, 31.0, 41.0, 46.0, 53.0];
         let mut all_elbows = kl.all_elbows();
@@ -1107,5 +1139,50 @@ mod tests {
             );
             assert_abs_diff_eq!(detected, expected, epsilon = 1e-6);
         }
+    }
+
+    #[test]
+    fn test_knee_locator_input_validation() {
+        let params = KneeLocatorParams::new(
+            ValidCurve::Convex,
+            ValidDirection::Increasing,
+            InterpMethod::Interp1d,
+        );
+
+        // Test both x and y vectors empty
+        let result = KneeLocator::new(vec![], vec![], 1.0, params.clone());
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "parameter error input series cannot be empty!"
+        );
+
+        // Test empty x vector
+        let result = KneeLocator::new(vec![], vec![1.0, 2.0, 3.0], 1.0, params.clone());
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "parameter error input series cannot be empty!"
+        );
+
+        // Test empty y vector
+        let result = KneeLocator::new(vec![1.0, 2.0, 3.0], vec![], 1.0, params.clone());
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "parameter error input series cannot be empty!"
+        );
+
+        // Test unequal lengths
+        let result = KneeLocator::new(vec![1.0, 2.0], vec![1.0, 2.0, 3.0], 1.0, params.clone());
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "parameter error input series should have equal length!"
+        );
+
+        // Test valid input
+        let result = KneeLocator::new(vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 1.0, params);
+        assert!(result.is_ok());
     }
 }

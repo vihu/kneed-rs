@@ -278,6 +278,7 @@ dependencies = [
  "polyfit-rs",
  "rand",
  "rand_distr",
+ "thiserror",
 ]
 
 [[package]]
