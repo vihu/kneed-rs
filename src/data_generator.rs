@@ -69,8 +69,18 @@ impl DataGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::assert_relative_eq;
+    use approx::assert_abs_diff_eq;
     use ndarray::Array1;
+
+    fn assert_array1_abs_diff_eq(arr1: &Array1<f64>, arr2: &Array1<f64>) {
+        const EPSILON: f64 = 1e-7;
+
+        assert_eq!(arr1.len(), arr2.len(), "Arrays must have the same length");
+
+        for (a, b) in arr1.iter().zip(arr2.iter()) {
+            assert_abs_diff_eq!(a, b, epsilon = EPSILON);
+        }
+    }
 
     #[test]
     fn test_noisy_gaussian() {
@@ -83,7 +93,7 @@ mod tests {
 
         // Check if y is a sequence from 0 to 0.99 with step 0.01
         let expected_y = Array1::linspace(0.0, 0.99, 100);
-        assert_relative_eq!(y, expected_y, epsilon = 1e-7);
+        assert_array1_abs_diff_eq(&y, &expected_y);
 
         // Check the range of x values
         assert!(x.iter().all(|&val| (20.0..=80.0).contains(&val)));
@@ -94,9 +104,9 @@ mod tests {
         let (x, y) = DataGenerator::figure2();
         assert_eq!(x.len(), 10);
         assert_eq!(y.len(), 10);
-        assert_relative_eq!(x, Array1::linspace(0.0, 1.0, 10), epsilon = 1e-7);
+        assert_array1_abs_diff_eq(&x, &Array1::linspace(0.0, 1.0, 10));
         let expected_y = &(-1.0 / (&x + 0.1)) + 5.0;
-        assert_relative_eq!(y, expected_y, epsilon = 1e-7);
+        assert_array1_abs_diff_eq(&y, &expected_y);
     }
 
     #[test]
@@ -164,6 +174,6 @@ mod tests {
             2202.7, 2184.3, 2170.1, 2160.0, 2127.7, 2134.7, 2102.0, 2101.4, 2066.4, 2074.3, 2063.7,
             2048.1, 2031.9
         ];
-        assert_relative_eq!(y, expected_y, epsilon = 1e-7);
+        assert_array1_abs_diff_eq(&y, &expected_y);
     }
 }

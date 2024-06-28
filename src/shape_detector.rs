@@ -42,11 +42,14 @@ fn find_shape(x: &Array1<f64>, y: &Array1<f64>) -> Shape {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knee_locator::{ValidCurve, ValidDirection};
+    use crate::{
+        data_generator::DataGenerator,
+        knee_locator::{ValidCurve, ValidDirection},
+    };
     use ndarray::array;
 
     #[test]
-    fn test_find_shape() {
+    fn test_curve_and_direction() {
         // Test case 1
         let x1 = array![1.0, 2.0, 3.0, 4.0, 5.0];
         let y1 = array![1.0, 3.0, 6.0, 10.0, 15.0];
@@ -109,6 +112,33 @@ mod tests {
         assert_eq!(
             find_shape(&x8, &y8),
             (ValidDirection::Increasing, ValidCurve::Convex)
+        );
+    }
+
+    #[test]
+    fn test_find_shape() {
+        let (x, y) = DataGenerator::concave_increasing();
+        assert_eq!(
+            find_shape(&x, &y),
+            (ValidDirection::Increasing, ValidCurve::Concave)
+        );
+
+        let (x, y) = DataGenerator::concave_decreasing();
+        assert_eq!(
+            find_shape(&x, &y),
+            (ValidDirection::Decreasing, ValidCurve::Concave)
+        );
+
+        let (x, y) = DataGenerator::convex_increasing();
+        assert_eq!(
+            find_shape(&x, &y),
+            (ValidDirection::Increasing, ValidCurve::Convex)
+        );
+
+        let (x, y) = DataGenerator::convex_decreasing();
+        assert_eq!(
+            find_shape(&x, &y),
+            (ValidDirection::Decreasing, ValidCurve::Convex)
         );
     }
 }
