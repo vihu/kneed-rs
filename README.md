@@ -1,5 +1,7 @@
 ## kneed-rs
 
+![build](https://github.com/vihu/kneed-rs/actions/workflows/rust.yml/badge.svg)
+
 This is a pure rust implementation of [Knee-point detection](https://raghavan.usc.edu//papers/kneedle-simplex11.pdf).
 
 The code here aims to be a 1:1 match of [kneed](https://pypi.org/project/kneed/).
